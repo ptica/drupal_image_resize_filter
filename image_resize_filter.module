@@ -1,0 +1,315 @@
+<?php
+// $Id$
+
+/**
+ * @file image_resize_fitler.module
+ *
+ * After adding to an input format, this filter will parse the contents of
+ * submitted content and automatically scale image files to match the set
+ * dimensions of img tags.
+ *
+ * Image that have been created take on the ownership of the original file.
+ * Making so when the primary node is deleted, the images it provided are
+ * deleted also.
+ *
+ */
+
+/**
+ * Implementation of hook_filter().
+ */
+function image_resize_filter_filter($op, $delta = 0, $format = -1, $text = '') {
+  switch ($op) {
+    case 'list':
+      return array(0 => t('Image resize filter'));
+
+    case 'description':
+      return t('Resizes images to the exact dimensions specified in the &lt;img&gt; tag.');
+
+    case 'settings':
+      return image_resize_filter_form($format);
+
+    case 'process':
+      $settings['allowed_difference'] = variable_get('image_resize_filter_allowed_difference_'. $format, 20);
+      $settings['image_locations'] = variable_get('image_resize_filter_image_locations_'. $format, array('local'));
+      $images = image_resize_filter_get_images($settings, $text);
+      return image_resize_filter_process($images, $text);
+
+    default:
+      return $text;
+  }
+}
+
+/**
+ * Implementation of hook_nodeapi().
+ */
+function image_resize_filter_nodeapi(&$node, $op, $teaser, $page) {
+  if (($op == 'presave' || $op == 'delete') && isset($node->files)) {
+    // Delete upload.module derivatives.
+    foreach ($node->files as $fid => $file) {
+      // File is an an object on delete, but array on presave.
+      $file = (array)$file;
+      if ($file['remove'] || $op == 'delete') {
+        image_resize_filter_remove_derivatives($file['filepath']);
+      }
+    }
+    // TODO: Add imagefield/filefield support.
+  }
+}
+
+function image_resize_filter_form($format) {
+  $form = array();
+
+  $form['image_resize'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Image resize settings'),
+    '#collapsible' => TRUE,
+    '#description' => t('The image resize filter will analyze &lt;img&gt; tags and compare the given height and width attributes to the actual file. If the file dimensions are different than those given in the &lt;img&gt; tag, the image will be copied and the src attribute will be updated to point to the resized image.'),
+  );
+
+  $form['image_resize']['image_resize_filter_allowed_difference_'. $format] = array(
+    '#type' => 'textfield',
+    '#title' => t('Allowed image size difference'),
+    '#default_value' => variable_get('image_resize_filter_allowed_difference_'. $format, 20),
+    '#size' => 5,
+    '#maxlength' => 3,
+    '#field_suffix' => ' '. t('pixels'),
+    '#required' => TRUE,
+    '#description' => t('The number of pixels the &lt;img&gt; tag and actual image are allowed to differ before creating a resized version of the image. Set to 0 to always match &lt;img&gt; tags exactly.'),
+  );
+
+  $form['image_resize']['image_resize_filter_image_locations_'. $format] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Resize images stored'),
+    '#options' => array('local' => t('Locally'), 'remote' => t('On remote servers')),
+    '#default_value' => variable_get('image_resize_filter_image_locations_'. $format, array('local')),
+    '#required' => TRUE,
+    '#description' => t('This option will determine which images will be analyzed for &lt;img&gt; tag differences. Enabling resizing of remote images can have performance impacts, as all images in the filtered text needs to be transfered via HTTP each time the filter cache is cleared.'),
+  );
+
+  return $form;
+}
+
+/**
+ * Parsing function to locate all images in a piece of text that need replacing.
+ *
+ * @param $settings
+ *   An array of settings that will be used to identify which images need
+ *   updating. Includes the following:
+ *
+ *   - allowed_difference: A maximum difference between the img tag's height
+ *     and width properties versus the actual size of the image. Can be used
+ *     to prevent resizing of images when the tag is only a few pixels off.
+ *
+ *   - image_locations: An array of acceptable image locations. May contain any
+ *     of the following values: "remote". Remote image will be downloaded and
+ *     saved locally. This procedure is intensive as the images need to
+ *     be retrieved to have their dimensions checked.
+ *
+ * @param $text
+ *   The text to be updated with the new img src tags.
+ */
+function image_resize_filter_get_images($settings, $text) {
+  $images = array();
+
+  // Find all image tags, ensuring that they have a src.
+  $matches = array();
+  preg_match_all('/<img[^>]*?src[ ]*=[ ]*"([^"]+)"[^>]*>/', $text, $matches);
+
+  // Loop through matches and find if replacements are necessary.
+  // $matches[0]: All complete image tag matches.
+  // $matches[1]: The src value of each match.
+  foreach ($matches[0] as $key => $img_tag) {
+    $src = $matches[1][$key];
+
+    // Because we don't know the order of the attributes and images might not
+    // have both attributes, match individually for height and width.
+    $width_matches = array();
+    $height_matches = array();
+
+    preg_match('/width[ ]*=[ ]*"?([0-9]+)"?/', $img_tag, $width_matches);
+    preg_match('/height[ ]*=[ ]*"?([0-9]+)"?/', $img_tag, $height_matches);
+
+    $width = !empty($width_matches[1]) ? $width_matches[1] : FALSE;
+    $height = !empty($height_matches[1]) ? $height_matches[1] : FALSE;
+
+    // If height and width are both missing, nothing to do here.
+    if (!$width && !$height) {
+      continue;
+    }
+
+    // Check the image extension.
+    $extension_matches = array();
+    preg_match('/.([a-zA-Z0-9]+)$/', $src, $extension_matches);
+    if (empty($extension_matches) || !in_array(drupal_strtolower($extension_matches[1]), array('png', 'jpg', 'jpeg', 'gif'))) {
+      continue;
+    }
+    $extension = strtolower($extension_matches[1]);
+
+    // Determine if this is a local or remote file.
+    $location = 'unknown';
+    if (strpos($src, '/') === 0 || strpos($src, '.') === 0) {
+      $location = 'local';
+    }
+    elseif (preg_match('/http[s]?:\/\/'. preg_quote($_SERVER['HTTP_HOST'], '/') .'/', $src)) {
+      $location = 'local';
+    }
+    elseif (strpos($src, 'http') === 0) {
+      $location = 'remote';
+    }
+
+    // If not resizing images in this location, continue on to the next image.
+    if (!in_array($location, $settings['image_locations'])) {
+      continue;
+    }
+
+    // Convert the URL to a local path.
+    $local_path = NULL;
+    if ($location == 'local') {
+      if (strpos($src, '.') !== 0) {
+        // TODO: Support private downloads by matching system/files here.
+        $local_path = preg_replace('/('. preg_quote($_SERVER['HTTP_HOST'], '/') .')?'. preg_quote(base_path(), '/') .'/', '', $src, 1);
+      }
+      $local_path = urldecode($local_path);
+    }
+
+    // Get the image size.
+    if ($location == 'local') {
+      $image_size = getimagesize($local_path);
+    }
+    else {
+      $image_size = getimagesize($src);
+    }
+
+    // All this work and the image isn't even there. Bummer. Next image please.
+    if ($image_size == FALSE) {
+      continue;
+    }
+
+    $actual_width = $image_size[0];
+    $actual_height = $image_size[1];
+
+    // If either height or width is missing, calculate the other.
+    if (!$height) {
+      $ratio = $actual_height/$actual_width;
+      $height = round($ratio * $width);
+    }
+    else {
+      $ratio = $actual_width/$actual_height;
+      $width = round($ratio * $height);
+    }
+
+    // Finally, if width and heights match up, don't do anything.
+    if ($actual_width == $width && $actual_height == $height) {
+      continue;
+    }
+
+    // If getting this far, the image exists and is not the right size.
+    // Add all information to a list of images that need resizing.
+    $images[] = array(
+      'expected_size' => array('width' => $width, 'height' => $height),
+      'actual_size' => array('width' => $image_size[0], 'height' => $image_size[1]),
+      'original' => $src,
+      'location' => $location,
+      'local_path' => $local_path,
+      'mime' => $image_size['mime'],
+      'extension' => $extension,
+    );
+  }
+
+  return $images;
+}
+
+
+/**
+ * Processing function for image resize filter. Replace img src properties
+ * with a URL to a resized image.
+ *
+ * @param $images
+ *   An array of image information, detailing images that need to be replaced.
+ * @param $text
+ *   The original text of the post that needs src tags updated.
+ */
+function image_resize_filter_process($images, $text) {
+  foreach ($images as $image) {
+    // Copy remote images locally.
+    if ($image['location'] == 'remote') {
+      $result = drupal_http_request($image['original']);
+      if ($result->code == 200) {
+        $tmp_file = tempnam(file_directory_temp(), 'image_resize_filter_');
+        $path_info = pathinfo($image['original']);
+
+        $handle = fopen($tmp_file, 'w');
+        fwrite($handle, $result->data);
+        fclose($handle);
+        $image['local_path'] = $tmp_file;
+        $image['destination'] = file_directory_path() .'/resize/remote/'. md5($result->data) .'-'. $image['expected_size']['width'] .'x'. $image['expected_size']['height'] .'.'. $path_info['extension'];
+      }
+      else {
+        continue;
+      }
+    }
+    else {
+      $path_info = pathinfo($image['local_path']);
+      $image['destination'] = file_directory_path() .'/resize/'. $path_info['dirname'] .'/'. $path_info['filename'] .'-'. $image['expected_size']['width'] .'x'. $image['expected_size']['height'] .'.'. $path_info['extension'];
+    }
+
+    // Ensure that the destination directories exist.
+    $directory = dirname($image['destination']);
+    $folders = explode('/', $directory);
+    $current_directory = '';
+    foreach ($folders as $folder) {
+      $current_directory .= $folder .'/';
+      $check_directory = $current_directory;
+      file_check_directory($check_directory, FILE_CREATE_DIRECTORY);
+    }
+
+    // Resize the local image.
+    if (!file_exists($image['destination'])) {
+      image_resize($image['local_path'], $image['destination'], $image['expected_size']['width'], $image['expected_size']['height']);
+    }
+
+    // Replace the existing image source with the resized image.
+    $base_path = base_path();
+    $text = preg_replace('/(<img[^>]*?src[ ]*=[ ]*")'. preg_quote($image['original'] ,'/') .'("[^>]*>)/', '$1'. $base_path . $image['destination'] .'$2', $text);
+  }
+  return $text;
+}
+
+/**
+ * Delete all generated image when the original file is removed.
+ */
+function image_resize_filter_remove_derivatives($original_filepath) {
+
+  // First delete all derivatives in the saved file location.
+  $path_info = pathinfo($original_filepath);
+  $basename = $path_info['basenname'];
+  $extension = $path_info['extension'];
+  $file_directory_path = file_directory_path();
+  $directory = $file_directory_path .'/resize/'. $path_info['dirname'];
+
+  // Delete all the derivatives.
+  file_scan_directory($directory, quotemeta($basename) .'-[0-9]+[x][0-9]+\.'. quotemeta($extension), array('.', '..', 'CVS'), 'file_delete');
+
+  // Then work up the directories and delete any empty ones.
+  $folders = explode('/', $directory);
+  $directories = array();
+  $current_directory = '';
+  foreach ($folders as $folder) {
+    $current_directory .= $folder .'/';
+    $directories[] = $current_directory;
+  }
+
+  foreach (array_reverse($directories) as $directory) {
+    if ($directory == ($file_directory_path .'/')) {
+      break;
+    }
+
+    $directory_files = file_scan_directory($directory, '.*');
+    if (empty($directory_files)) {
+      @rmdir($directory);
+    }
+    else {
+      break;
+    }
+  }
+}
