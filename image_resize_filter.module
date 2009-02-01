@@ -126,8 +126,8 @@ function image_resize_filter_get_images($settings, $text) {
     $width_matches = array();
     $height_matches = array();
 
-    preg_match('/width[ ]*=[ ]*"?([0-9]+)"?/', $img_tag, $width_matches);
-    preg_match('/height[ ]*=[ ]*"?([0-9]+)"?/', $img_tag, $height_matches);
+    preg_match('/width[ ]*[=,:][ ]*"?([0-9]+)"?/', $img_tag, $width_matches);
+    preg_match('/height[ ]*[=,:][ ]*"?([0-9]+)"?/', $img_tag, $height_matches);
 
     $width = !empty($width_matches[1]) ? $width_matches[1] : FALSE;
     $height = !empty($height_matches[1]) ? $height_matches[1] : FALSE;
