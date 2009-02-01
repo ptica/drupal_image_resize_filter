@@ -193,7 +193,7 @@ function image_resize_filter_get_images($settings, $text) {
       $ratio = $actual_height/$actual_width;
       $height = round($ratio * $width);
     }
-    else {
+    elseif (!$width) {
       $ratio = $actual_width/$actual_height;
       $width = round($ratio * $height);
     }
