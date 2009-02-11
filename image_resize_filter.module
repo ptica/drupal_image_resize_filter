@@ -341,7 +341,7 @@ function image_resize_filter_remove_derivatives($original_filepath) {
 
   // First delete all derivatives in the saved file location.
   $path_info = pathinfo($original_filepath);
-  $basename = $path_info['basenname'];
+  $basename = $path_info['filename'];
   $extension = $path_info['extension'];
   $file_directory_path = file_directory_path();
   $local_file_dir = str_replace($file_directory_path, '', $path_info['dirname']);
