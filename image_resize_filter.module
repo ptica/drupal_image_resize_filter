@@ -333,7 +333,7 @@ function image_resize_filter_process($images, $text, $settings) {
     else {
       $path_info = pathinfo($image['local_path']);
       $file_directory_path = file_directory_path();
-      $local_file_dir = str_replace($file_directory_path, '', $path_info['dirname']);
+      $local_file_dir = preg_replace('/^'. preg_quote($file_directory_path, '/') .'\/?/', '', $path_info['dirname']);
       $local_file_dir = !empty($local_file_dir) ? $local_file_dir . '/' : '';
       $image['destination'] = $file_directory_path .'/resize/'. $local_file_dir . $path_info['filename'] .'-'. $image['expected_size']['width'] .'x'. $image['expected_size']['height'] .'.'. $path_info['extension'];
     }
