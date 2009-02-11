@@ -57,7 +57,7 @@ function image_resize_filter_nodeapi(&$node, $op, $teaser, $page) {
       // File is an an object on delete, but array on presave.
       $file = (array)$file;
       if ($file['remove'] || $op == 'delete') {
-        image_resize_filter_remove_derivatives($file['filepath']);
+        image_resize_filter_delete_derivatives($file['filepath']);
       }
     }
     // TODO: Add imagefield/filefield support.
@@ -103,10 +103,6 @@ function image_resize_filter_form($format) {
  * @param $settings
  *   An array of settings that will be used to identify which images need
  *   updating. Includes the following:
- *
- *   - allowed_difference: A maximum difference between the img tag's height
- *     and width properties versus the actual size of the image. Can be used
- *     to prevent resizing of images when the tag is only a few pixels off.
  *
  *   - image_locations: An array of acceptable image locations. May contain any
  *     of the following values: "remote". Remote image will be downloaded and
@@ -337,7 +333,7 @@ function image_resize_fitler_update_tag($matches = NULL, $new_image = NULL) {
 /**
  * Delete all generated image when the original file is removed.
  */
-function image_resize_filter_remove_derivatives($original_filepath) {
+function image_resize_filter_delete_derivatives($original_filepath) {
 
   // First delete all derivatives in the saved file location.
   $path_info = pathinfo($original_filepath);
@@ -373,5 +369,34 @@ function image_resize_filter_remove_derivatives($original_filepath) {
     else {
       break;
     }
+  }
+}
+
+/**
+ * Delete the entire set of cached images.
+ */
+function image_resize_filter_delete_all() {
+  $directory = file_directory_path() .'/resize';
+  image_resize_filter_delete_recursive($directory);
+  cache_clear_all('*', 'cache_filter');
+}
+
+/**
+ * Recursive deletion function for clearing out resized images directory.
+ */
+function image_resize_filter_delete_recursive($path) {
+  if (is_file($path) || is_link($path)) {
+    unlink($path);
+  }
+  elseif (is_dir($path)) {
+    $dir = dir($path);
+    while (($entry = $dir->read()) !== false) {
+      if ($entry == '.' || $entry == '..') {
+        continue;
+      }
+      $entry_path = $path .'/'. $entry;
+      image_resize_filter_delete_recursive($entry_path);
+    }
+    rmdir($path);
   }
 }
