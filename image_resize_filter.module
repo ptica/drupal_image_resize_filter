@@ -34,7 +34,6 @@ function image_resize_filter_filter($op, $delta = 0, $format = -1, $text = '', $
       // Get a list of images in this text *before* other filters are run.
       // This makes is so that we can get the height and width within style
       // properties before they are stripped out by the Filtered HTML filter.
-      $settings['allowed_difference'] = variable_get('image_resize_filter_allowed_difference_'. $format, 20);
       $settings['image_locations'] = variable_get('image_resize_filter_image_locations_'. $format, array('local'));
       $images[$cache_id] = image_resize_filter_get_images($settings, $text);
       return $text;
@@ -72,17 +71,6 @@ function image_resize_filter_form($format) {
     '#title' => t('Image resize settings'),
     '#collapsible' => TRUE,
     '#description' => t('The image resize filter will analyze &lt;img&gt; tags and compare the given height and width attributes to the actual file. If the file dimensions are different than those given in the &lt;img&gt; tag, the image will be copied and the src attribute will be updated to point to the resized image.'),
-  );
-
-  $form['image_resize']['image_resize_filter_allowed_difference_'. $format] = array(
-    '#type' => 'textfield',
-    '#title' => t('Allowed image size difference'),
-    '#default_value' => variable_get('image_resize_filter_allowed_difference_'. $format, 20),
-    '#size' => 5,
-    '#maxlength' => 3,
-    '#field_suffix' => ' '. t('pixels'),
-    '#required' => TRUE,
-    '#description' => t('The number of pixels the &lt;img&gt; tag and actual image are allowed to differ before creating a resized version of the image. Set to 0 to always match &lt;img&gt; tags exactly.'),
   );
 
   $form['image_resize']['image_resize_filter_image_locations_'. $format] = array(

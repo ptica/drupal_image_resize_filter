@@ -13,7 +13,7 @@ function image_resize_filter_install() {
  */
 function image_resize_filter_uninstall() {
   image_resize_filter_delete_all();
-  db_query('DELETE FROM {variable} WHERE name LIKE "input_resize_filter_%"');
+  db_query("DELETE FROM {variable} WHERE name LIKE 'input_resize_filter_%'");
 }
 
 /**
@@ -21,8 +21,22 @@ function image_resize_filter_uninstall() {
  */
 function image_resize_filter_update_6100() {
   $ret = array();
+
   image_resize_filter_delete_all();
   $ret[] = array('success' => TRUE, 'query' => t('The location of resized images has changed. The currently resized images have been flushed.'));
+
+  return $ret;
+}
+
+/**
+ * Remove the "Image resize difference" option.
+ * It was confusing and didn't actually do anything.
+ */
+function image_resize_filter_update_6101() {
+  $ret = array();
+
+  db_query("DELETE FROM {variable} WHERE name LIKE 'image_resize_filter_allowed_difference_%'");
+  $ret[] = array('success' => TRUE, 'query' => t('Image resize allowed difference option removed.'));
 
   return $ret;
 }
