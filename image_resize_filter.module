@@ -17,7 +17,9 @@
 /**
  * Implementation of hook_filter().
  */
-function image_resize_filter_filter($op, $delta = 0, $format = -1, $text = '') {
+function image_resize_filter_filter($op, $delta = 0, $format = -1, $text = '', $cache_id = 0) {
+  static $images = array();
+
   switch ($op) {
     case 'list':
       return array(0 => t('Image resize filter'));
@@ -28,11 +30,17 @@ function image_resize_filter_filter($op, $delta = 0, $format = -1, $text = '') {
     case 'settings':
       return image_resize_filter_form($format);
 
-    case 'process':
+    case 'prepare':
+      // Get a list of images in this text *before* other filters are run.
+      // This makes is so that we can get the height and width within style
+      // properties before they are stripped out by the Filtered HTML filter.
       $settings['allowed_difference'] = variable_get('image_resize_filter_allowed_difference_'. $format, 20);
       $settings['image_locations'] = variable_get('image_resize_filter_image_locations_'. $format, array('local'));
-      $images = image_resize_filter_get_images($settings, $text);
-      return image_resize_filter_process($images, $text);
+      $images[$cache_id] = image_resize_filter_get_images($settings, $text);
+      return $text;
+
+    case 'process':
+      return isset($images[$cache_id]) ? image_resize_filter_process($images[$cache_id], $text) : $text;
 
     default:
       return $text;
