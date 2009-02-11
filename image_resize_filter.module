@@ -276,9 +276,10 @@ function image_resize_filter_process($images, $text) {
     }
     else {
       $path_info = pathinfo($image['local_path']);
-      $local_file_dir = str_replace(file_directory_path(), '', $path_info['dirname']);
+      $file_directory_path = file_directory_path();
+      $local_file_dir = str_replace($file_directory_path, '', $path_info['dirname']);
       $local_file_dir = !empty($local_file_dir) ? $local_file_dir . '/' : '';
-      $image['destination'] = file_directory_path() .'/resize/'. $local_file_dir . $path_info['filename'] .'-'. $image['expected_size']['width'] .'x'. $image['expected_size']['height'] .'.'. $path_info['extension'];
+      $image['destination'] = $file_directory_path .'/resize/'. $local_file_dir . $path_info['filename'] .'-'. $image['expected_size']['width'] .'x'. $image['expected_size']['height'] .'.'. $path_info['extension'];
     }
 
     // Ensure that the destination directories exist.
@@ -343,7 +344,10 @@ function image_resize_filter_remove_derivatives($original_filepath) {
   $basename = $path_info['basenname'];
   $extension = $path_info['extension'];
   $file_directory_path = file_directory_path();
-  $directory = $file_directory_path .'/resize/'. $path_info['dirname'];
+  $local_file_dir = str_replace($file_directory_path, '', $path_info['dirname']);
+  $local_file_dir = !empty($local_file_dir) ? $local_file_dir . '/' : '';
+
+  $directory = $file_directory_path .'/resize/'. $local_file_dir;
 
   // Delete all the derivatives.
   file_scan_directory($directory, quotemeta($basename) .'-[0-9]+[x][0-9]+\.'. quotemeta($extension), array('.', '..', 'CVS'), 'file_delete');
