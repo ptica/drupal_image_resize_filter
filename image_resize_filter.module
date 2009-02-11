@@ -39,7 +39,9 @@ function image_resize_filter_filter($op, $delta = 0, $format = -1, $text = '', $
       return $text;
 
     case 'process':
-      return isset($images[$cache_id]) ? image_resize_filter_process($images[$cache_id], $text) : $text;
+      $settings['link'] = variable_get('image_resize_filter_link_'. $format, 0);
+      $settings['class'] = variable_get('image_resize_filter_link_class_'. $format, '');
+      return isset($images[$cache_id]) ? image_resize_filter_process($images[$cache_id], $text, $settings) : $text;
 
     default:
       return $text;
@@ -63,6 +65,20 @@ function image_resize_filter_nodeapi(&$node, $op, $teaser, $page) {
   }
 }
 
+/**
+ * Implementation of hook_theme().
+ */
+function image_resize_filter_theme() {
+  return array(
+    'image_resize_filter_form' => array(
+      'arguments' => array('form' => NULL),
+    ),
+  );
+}
+
+/**
+ * The form for configuring the Image Resize Filter.
+ */
 function image_resize_filter_form($format) {
   $form = array();
 
@@ -71,6 +87,8 @@ function image_resize_filter_form($format) {
     '#title' => t('Image resize settings'),
     '#collapsible' => TRUE,
     '#description' => t('The image resize filter will analyze &lt;img&gt; tags and compare the given height and width attributes to the actual file. If the file dimensions are different than those given in the &lt;img&gt; tag, the image will be copied and the src attribute will be updated to point to the resized image.'),
+    '#theme' => 'image_resize_filter_form',
+    '#format' => $format,
   );
 
   $form['image_resize']['image_resize_filter_image_locations_'. $format] = array(
@@ -82,7 +100,59 @@ function image_resize_filter_form($format) {
     '#description' => t('This option will determine which images will be analyzed for &lt;img&gt; tag differences. Enabling resizing of remote images can have performance impacts, as all images in the filtered text needs to be transfered via HTTP each time the filter cache is cleared.'),
   );
 
+  $form['image_resize']['image_resize_filter_link_'. $format] = array(
+    '#type' => 'checkbox',
+    '#title' => t('If resized, add a link to the original image.'),
+    '#default_value' => variable_get('image_resize_filter_link_'. $format, 0),
+  );
+
+  $form['image_resize']['image_resize_filter_link_class_'. $format] = array(
+    '#type' => 'textfield',
+    '#title' => t('Optionally, give it the class'),
+    '#size' => '10',
+    '#default_value' => variable_get('image_resize_filter_link_class_'. $format, ''),
+  );
+
   return $form;
+}
+
+/**
+ * Theme callback to theme the Image Resize Filter form.
+ */
+function theme_image_resize_filter_form($form) {
+  $format = $form['#format'];
+
+  $link = 'image_resize_filter_link_'. $format;
+  $class = 'image_resize_filter_link_class_'. $format;
+
+  $class_element = ' ';
+  $class_element .= '<span class="image-resize-filter-class">';
+  $class_element .= $form[$class]['#title'] .': ';
+
+  unset($form[$class]['#title']);
+
+  $class_element .= drupal_render($form[$class]);
+  $class_element .= '</span>';
+
+  $link_element = drupal_render($form[$link]);
+
+  $output = '';
+  $output .= '<div class="container-inline image-resize-filter-link-options">';
+  $output .= $link_element;
+  $output .= $class_element;
+  $output .= '</div>';
+
+  $placeholder = array(
+    '#type' => 'element',
+    '#title' => t('Link to the original'),
+    '#children' => $output,
+    '#description' => t('Linking to the original can be helpful to give users a full-size view of the image. Adding the class "thickbox" is helpful if you have installed the <a href="http://drupal.org/project/thickbox">thickbox module</a>.'),
+  );
+
+  // Add a little bit of JavaScript. Not cached since it's only used here.
+  drupal_add_js(drupal_get_path('module', 'image_resize_filter') .'/image_resize_filter.js', 'module', 'header', FALSE, FALSE);
+
+  return drupal_render($form) . theme('form_element', $placeholder, $output);
 }
 
 /**
@@ -238,8 +308,10 @@ function image_resize_filter_get_images($settings, $text) {
  *   An array of image information, detailing images that need to be replaced.
  * @param $text
  *   The original text of the post that needs src tags updated.
+ * @param $settings
+ *   An array of setting for generating the image tag.
  */
-function image_resize_filter_process($images, $text) {
+function image_resize_filter_process($images, $text, $settings) {
   foreach ($images as $image) {
     // Copy remote images locally.
     if ($image['location'] == 'remote') {
@@ -284,7 +356,7 @@ function image_resize_filter_process($images, $text) {
     // Replace the existing image source with the resized image.
     $base_path = base_path();
     // Set the image we're currently updating in the callback function.
-    image_resize_fitler_update_tag(NULL, $image);
+    image_resize_fitler_update_tag(NULL, $image, $settings);
     $text = preg_replace_callback('/(<img[^>]*?src[ ]*=[ ]*")'. preg_quote($image['original'] ,'/') .'("[^>]*?)(\/?>)/', 'image_resize_fitler_update_tag', $text);
   }
   return $text;
@@ -299,10 +371,15 @@ function image_resize_filter_process($images, $text) {
  *   If passed in, this will set a static variable so that this image data is
  *   available when this function is called from a regular expression.
  */
-function image_resize_fitler_update_tag($matches = NULL, $new_image = NULL) {
-  static $image;
+function image_resize_fitler_update_tag($matches = NULL, $new_image = NULL, $new_settings = NULL) {
+  static $image, $settings;
 
   $image = isset($new_image) ? $new_image : $image;
+  $settings = isset($new_settings) ? $new_settings : $settings;
+
+  if (!isset($matches)) {
+    return;
+  }
 
   $output = '';
   $output .= $matches[1]; // The start of the tag.
@@ -314,6 +391,10 @@ function image_resize_fitler_update_tag($matches = NULL, $new_image = NULL) {
   $output .= $image['add_properties']['height'] ? ' height="'. $image['expected_size']['height'] .'"' : '';
 
   $output .= $matches[3]; // The closing "/>".
+  if ($settings['link']) {
+    $class = !empty($settings['class']) ? ' class="'. $settings['class'] .'"' : '';
+    $output = '<a href="'. $image['original'] .'"'. $class . '>'. $output .'</a>';
+  }
 
   return $output;
 }
