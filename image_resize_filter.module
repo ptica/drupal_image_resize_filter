@@ -121,16 +121,33 @@ function image_resize_filter_get_images($settings, $text) {
   foreach ($matches[0] as $key => $img_tag) {
     $src = $matches[1][$key];
 
+    $width = NULL;
+    $height = NULL;
+    $needs_height = FALSE;
+    $needs_width = FALSE;
+
     // Because we don't know the order of the attributes and images might not
     // have both attributes, match individually for height and width.
-    $width_matches = array();
-    $height_matches = array();
-
-    preg_match('/width[ ]*[=,:][ ]*"?([0-9]+)"?/', $img_tag, $width_matches);
-    preg_match('/height[ ]*[=,:][ ]*"?([0-9]+)"?/', $img_tag, $height_matches);
-
-    $width = !empty($width_matches[1]) ? $width_matches[1] : FALSE;
-    $height = !empty($height_matches[1]) ? $height_matches[1] : FALSE;
+    foreach (array('width', 'height') as $property) {
+      $matches = array();
+      preg_match_all('/'. $property .'[ ]*([=:])[ ]*"?([0-9]+)"?/', $img_tag, $matches);
+      // In the odd scenario there is both a style="width: xx" and a width="xx"
+      // tag, base our calculations off the style tag, since that's what the
+      // browser will display.
+      $key = 0;
+      $needs_property = FALSE;
+      if (count($matches[1]) > 1) {
+        $key = array_search(':', $matches[1]);
+      }
+      // Only a style property found, we'll need to add a real height/width tag
+      // to the HTML later. This specifically prevents problems with FCKeditor
+      // that only adds style tags when resizing images.
+      elseif ($matches[1][$key] == ':'){
+        $needs_property = TRUE;
+      }
+      ${$property} = !empty($matches[2][$key]) ? $matches[2][$key] : FALSE;
+      ${'needs_'. $property} = $needs_property;
+    }
 
     // If height and width are both missing, nothing to do here.
     if (!$width && !$height) {
@@ -167,7 +184,7 @@ function image_resize_filter_get_images($settings, $text) {
     if ($location == 'local') {
       if (strpos($src, '.') !== 0) {
         // TODO: Support private downloads by matching system/files here.
-        $local_path = preg_replace('/('. preg_quote($_SERVER['HTTP_HOST'], '/') .')?'. preg_quote(base_path(), '/') .'/', '', $src, 1);
+        $local_path = preg_replace('/(http[s]?:\/\/'. preg_quote($_SERVER['HTTP_HOST'], '/') .')?'. preg_quote(base_path(), '/') .'/', '', $src, 1);
       }
       $local_path = urldecode($local_path);
     }
@@ -208,6 +225,7 @@ function image_resize_filter_get_images($settings, $text) {
     $images[] = array(
       'expected_size' => array('width' => $width, 'height' => $height),
       'actual_size' => array('width' => $image_size[0], 'height' => $image_size[1]),
+      'add_properties' => array('width' => $needs_width, 'height' => $needs_height),
       'original' => $src,
       'location' => $location,
       'local_path' => $local_path,
@@ -270,9 +288,39 @@ function image_resize_filter_process($images, $text) {
 
     // Replace the existing image source with the resized image.
     $base_path = base_path();
-    $text = preg_replace('/(<img[^>]*?src[ ]*=[ ]*")'. preg_quote($image['original'] ,'/') .'("[^>]*>)/', '$1'. $base_path . $image['destination'] .'$2', $text);
+    // Set the image we're currently updating in the callback function.
+    image_resize_fitler_update_tag(NULL, $image);
+    $text = preg_replace_callback('/(<img[^>]*?src[ ]*=[ ]*")'. preg_quote($image['original'] ,'/') .'("[^>]*?)(\/?>)/', 'image_resize_fitler_update_tag', $text);
   }
   return $text;
+}
+
+/**
+ * Regular expression callback.
+ *
+ * @param $matches
+ *   The matches for a call to preg_replace_callback().
+ * @param $new_image
+ *   If passed in, this will set a static variable so that this image data is
+ *   available when this function is called from a regular expression.
+ */
+function image_resize_fitler_update_tag($matches = NULL, $new_image = NULL) {
+  static $image;
+
+  $image = isset($new_image) ? $new_image : $image;
+
+  $output = '';
+  $output .= $matches[1]; // The start of the tag.
+  $output .= base_path() . $image['destination']; // The new src.
+  $output .= $matches[2]; // The end of the tag, excluding the closing "/>".
+
+  // Add height and width properties if they are missing from the original tag.
+  $output .= $image['add_properties']['width'] ? ' width="'. $image['expected_size']['width'] .'"' : '';
+  $output .= $image['add_properties']['height'] ? ' height="'. $image['expected_size']['height'] .'"' : '';
+
+  $output .= $matches[3]; // The closing "/>".
+
+  return $output;
 }
 
 /**
