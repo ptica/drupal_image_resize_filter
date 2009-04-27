@@ -41,6 +41,7 @@ function image_resize_filter_filter($op, $delta = 0, $format = -1, $text = '', $
     case 'process':
       $settings['link'] = variable_get('image_resize_filter_link_'. $format, 0);
       $settings['class'] = variable_get('image_resize_filter_link_class_'. $format, '');
+      $settings['rel'] = variable_get('image_resize_filter_link_rel_'. $format, '');
       return isset($images[$cache_id]) ? image_resize_filter_process($images[$cache_id], $text, $settings) : $text;
 
     default:
@@ -113,6 +114,13 @@ function image_resize_filter_form($format) {
     '#default_value' => variable_get('image_resize_filter_link_class_'. $format, ''),
   );
 
+  $form['image_resize']['image_resize_filter_link_rel_'. $format] = array(
+    '#type' => 'textfield',
+    '#title' => t('and/or a rel attribute'),
+    '#size' => '10',
+    '#default_value' => variable_get('image_resize_filter_link_rel_'. $format, ''),
+  );
+
   return $form;
 }
 
@@ -124,15 +132,23 @@ function theme_image_resize_filter_form($form) {
 
   $link = 'image_resize_filter_link_'. $format;
   $class = 'image_resize_filter_link_class_'. $format;
+  $rel = 'image_resize_filter_link_rel_'. $format;
+
+  // Remove the titles that we don't want to display inline.
+  unset($form[$class]['#title']);
+  unset($form[$rel]['#title']);
 
   $class_element = ' ';
   $class_element .= '<span class="image-resize-filter-class">';
   $class_element .= $form[$class]['#title'] .': ';
-
-  unset($form[$class]['#title']);
-
   $class_element .= drupal_render($form[$class]);
   $class_element .= '</span>';
+
+  $rel_element = ' ';
+  $rel_element .= '<span class="image-resize-filter-rel">';
+  $rel_element .= $form[$rel]['#title'] .': ';
+  $rel_element .= drupal_render($form[$rel]);
+  $rel_element .= '</span>';
 
   $link_element = drupal_render($form[$link]);
 
@@ -140,13 +156,14 @@ function theme_image_resize_filter_form($form) {
   $output .= '<div class="container-inline image-resize-filter-link-options">';
   $output .= $link_element;
   $output .= $class_element;
+  $output .= $rel_element;
   $output .= '</div>';
 
   $placeholder = array(
     '#type' => 'element',
     '#title' => t('Link to the original'),
     '#children' => $output,
-    '#description' => t('Linking to the original can be helpful to give users a full-size view of the image. Adding the class "thickbox" is helpful if you have installed the <a href="http://drupal.org/project/thickbox">thickbox module</a>.'),
+    '#description' => t('Linking to the original can be helpful to give users a full-size view of the image. Adding the class "thickbox" is helpful if you have installed the <a href="http://drupal.org/project/thickbox">thickbox module</a>. The rel attribute may be useful when used with the <a href="http://drupal.org/project/lightbox2">lightbox2</a> and <a href="http://drupal.org/project/shadowbox">shadowbox</a> modules.'),
   );
 
   // Add a little bit of JavaScript. Not cached since it's only used here.
@@ -393,7 +410,8 @@ function image_resize_fitler_update_tag($matches = NULL, $new_image = NULL, $new
   $output .= $matches[3]; // The closing "/>".
   if ($settings['link']) {
     $class = !empty($settings['class']) ? ' class="'. $settings['class'] .'"' : '';
-    $output = '<a href="'. $image['original'] .'"'. $class . '>'. $output .'</a>';
+    $rel = !empty($settings['rel']) ? ' rel="'. $settings['rel'] .'"' : '';
+    $output = '<a href="'. $image['original'] .'"'. $class . $rel . '>'. $output .'</a>';
   }
 
   return $output;
