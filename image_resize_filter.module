@@ -128,19 +128,17 @@ function theme_image_resize_filter_form($form) {
   $class = 'image_resize_filter_link_class_'. $format;
   $rel = 'image_resize_filter_link_rel_'. $format;
 
-  // Remove the titles that we don't want to display inline.
-  unset($form[$class]['#title']);
-  unset($form[$rel]['#title']);
-
   $class_element = ' ';
   $class_element .= '<span class="image-resize-filter-class">';
-  $class_element .= $form[$class]['#title'] .': ';
+  $class_element .= check_plain($form[$class]['#title']) .': ';
+  $form[$class]['#title'] = NULL;
   $class_element .= drupal_render($form[$class]);
   $class_element .= '</span>';
 
   $rel_element = ' ';
   $rel_element .= '<span class="image-resize-filter-rel">';
-  $rel_element .= $form[$rel]['#title'] .': ';
+  $rel_element .= check_plain($form[$rel]['#title']) .': ';
+  $form[$rel]['#title'] = NULL;
   $rel_element .= drupal_render($form[$rel]);
   $rel_element .= '</span>';
 
