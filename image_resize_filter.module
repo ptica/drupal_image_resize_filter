@@ -262,12 +262,23 @@ function image_resize_filter_get_images($settings, $text) {
       $local_path = urldecode($local_path);
     }
 
+    // If this is an ImageCache preset, generate the source image if necessary.
+    if (!file_exists($local_path) && strpos($local_path, 'imagecache') !== FALSE && function_exists('imagecache_build_derivative')) {
+      $imagecache_path = preg_replace('/^'. preg_quote(file_directory_path(), '/') .'\/imagecache\//', '', $local_path);
+      $imagecache_args = explode('/', $imagecache_path);
+      $preset_name = array_shift($imagecache_args);
+      $original_path = implode('/', $imagecache_args);
+      if ($preset = imagecache_preset_by_name($preset_name)) {
+        imagecache_build_derivative($preset['actions'], $original_path, imagecache_create_path($preset_name, $original_path));
+      }
+    }
+
     // Get the image size.
     if ($location == 'local') {
-      $image_size = getimagesize($local_path);
+      $image_size = @getimagesize($local_path);
     }
     else {
-      $image_size = getimagesize($src);
+      $image_size = @getimagesize($src);
     }
 
     // All this work and the image isn't even there. Bummer. Next image please.
