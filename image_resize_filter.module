@@ -340,7 +340,7 @@ function image_resize_filter_process($images, $text, $settings) {
       $result = drupal_http_request($image['original']);
       if ($result->code == 200) {
         $tmp_file = tempnam(file_directory_temp(), 'image_resize_filter_');
-        $path_info = pathinfo($image['original']);
+        $path_info = image_resize_filter_pathinfo($image['original']);
 
         $handle = fopen($tmp_file, 'w');
         fwrite($handle, $result->data);
@@ -353,7 +353,7 @@ function image_resize_filter_process($images, $text, $settings) {
       }
     }
     else {
-      $path_info = pathinfo($image['local_path']);
+      $path_info = image_resize_filter_pathinfo($image['local_path']);
       $file_directory_path = file_directory_path();
       $local_file_dir = preg_replace('/^'. preg_quote($file_directory_path, '/') .'\/?/', '', $path_info['dirname']);
       $local_file_dir = !empty($local_file_dir) ? $local_file_dir . '/' : '';
@@ -431,7 +431,7 @@ function image_resize_fitler_update_tag($matches = NULL, $new_image = NULL, $new
 function image_resize_filter_delete_derivatives($original_filepath) {
 
   // First delete all derivatives in the saved file location.
-  $path_info = pathinfo($original_filepath);
+  $path_info = image_resize_filter_pathinfo($original_filepath);
   $basename = $path_info['filename'];
   $extension = $path_info['extension'];
   $file_directory_path = file_directory_path();
@@ -494,4 +494,16 @@ function image_resize_filter_delete_recursive($path) {
     }
     rmdir($path);
   }
+}
+
+/**
+ * Utility function to return path information.
+ */
+function image_resize_filter_pathinfo($path) {
+  $info = pathinfo($path);
+  // Filename was added in PHP 5.2, add it for older PHP versions.
+  if (!isset($info['filename'])) {
+    $info['filename'] = basename($path, '.' . $info['extension']);
+  }
+  return $info;
 }
