@@ -22,6 +22,7 @@ function image_resize_filter_uninstall() {
 function image_resize_filter_update_6100() {
   $ret = array();
 
+  drupal_load('module', 'image_resize_filter');
   image_resize_filter_delete_all();
   $ret[] = array('success' => TRUE, 'query' => t('The location of resized images has changed. The currently resized images have been flushed.'));
 
@@ -37,6 +38,19 @@ function image_resize_filter_update_6101() {
 
   db_query("DELETE FROM {variable} WHERE name LIKE 'image_resize_filter_allowed_difference_%'");
   $ret[] = array('success' => TRUE, 'query' => t('Image resize allowed difference option removed.'));
+
+  return $ret;
+}
+
+/**
+ * Clear out all resized images to give them proper names if they were missing.
+ */
+function image_resize_filter_update_6102() {
+  $ret = array();
+
+  drupal_load('module', 'image_resize_filter');
+  image_resize_filter_delete_all();
+  $ret[] = array('success' => TRUE, 'query' => t('Previously resized images may have been missing file names. The currently resized images have been flushed.'));
 
   return $ret;
 }
