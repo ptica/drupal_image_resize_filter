@@ -30,19 +30,13 @@ function image_resize_filter_filter($op, $delta = 0, $format = -1, $text = '', $
     case 'settings':
       return image_resize_filter_form($format);
 
-    case 'prepare':
-      // Get a list of images in this text *before* other filters are run.
-      // This makes is so that we can get the height and width within style
-      // properties before they are stripped out by the Filtered HTML filter.
-      $settings['image_locations'] = variable_get('image_resize_filter_image_locations_'. $format, array('local'));
-      $images[$cache_id] = image_resize_filter_get_images($settings, $text);
-      return $text;
-
     case 'process':
       $settings['link'] = variable_get('image_resize_filter_link_'. $format, 0);
       $settings['class'] = variable_get('image_resize_filter_link_class_'. $format, '');
       $settings['rel'] = variable_get('image_resize_filter_link_rel_'. $format, '');
-      return isset($images[$cache_id]) ? image_resize_filter_process($images[$cache_id], $text, $settings) : $text;
+      $settings['image_locations'] = variable_get('image_resize_filter_image_locations_'. $format, array('local'));
+      $images = image_resize_filter_get_images($settings, $text);
+      return image_resize_filter_process($images, $text, $settings);
 
     default:
       return $text;
