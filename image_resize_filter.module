@@ -356,7 +356,10 @@ function image_resize_filter_process($images, $text, $settings) {
     foreach ($folders as $folder) {
       $current_directory .= $folder .'/';
       $check_directory = $current_directory;
-      file_check_directory($check_directory, FILE_CREATE_DIRECTORY);
+      // Use the "quiet" version of file_check_directory() provided by FileField
+      // if it exists. This suppresses "Directory was created" messages.
+      $file_check_directory = function_exists('field_file_check_directory') ? 'field_file_check_directory' : 'file_check_directory';
+      $file_check_directory($check_directory, FILE_CREATE_DIRECTORY);
     }
 
     // Resize the local image.
