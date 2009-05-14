@@ -56,7 +56,15 @@ function image_resize_filter_nodeapi(&$node, $op, $teaser, $page) {
         image_resize_filter_delete_derivatives($file['filepath']);
       }
     }
-    // TODO: Add imagefield/filefield support.
+  }
+}
+
+/**
+ * Implementation of hook_file_delete().
+ */
+function image_resize_filter_file_delete($file) {
+  if (isset($file->filepath)) {
+    image_resize_filter_delete_derivatives($file->filepath);
   }
 }
 
