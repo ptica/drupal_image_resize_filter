@@ -72,6 +72,41 @@ function image_resize_filter_theme() {
 }
 
 /**
+ * Implementation of hook_file_download().
+ */
+function image_resize_filter_file_download($filepath) {
+  // If this is a resized image, use the same access as the original image.
+  $matches = array();
+  if (preg_match('/^resize\/(.*)?-\d+x\d+(\.png|jpg|jpeg|gif)$/', $filepath, $matches)) {
+    $headers = module_invoke_all('file_download', $matches[1] . $matches[2]);
+    if (in_array(-1, $headers)) {
+      return -1;
+    }
+    if (count($headers)) {
+      return array(
+        'Content-Type: ' . file_get_mimetype($filepath),
+        'Content-Length: ' . filesize(file_create_path($filepath)),
+      );
+    }
+  }
+}
+
+/**
+ * Implementation of hook_form_[form_id]_alter().
+ */
+function image_resize_filter_form_system_file_system_settings_alter($form, $form_state) {
+  $form['#submit'][] = 'image_resize_filter_file_system_settings_submit';
+}
+
+/**
+ * Additional #submit handler for the system_file_system_settings form.
+ */
+function image_resize_filter_file_system_settings_submit($form, $form_state) {
+  // Clear filter caches when changing file system information.
+  cache_clear_all('*', 'cache_filter');
+}
+
+/**
  * The form for configuring the Image Resize Filter.
  */
 function image_resize_filter_form($format) {
@@ -254,8 +289,12 @@ function image_resize_filter_get_images($settings, $text) {
     $local_path = NULL;
     if ($location == 'local') {
       if (strpos($src, '.') !== 0) {
-        // TODO: Support private downloads by matching system/files here.
+        // Remove the http:// and base path.
         $local_path = preg_replace('/(http[s]?:\/\/'. preg_quote($_SERVER['HTTP_HOST'], '/') .')?'. preg_quote(base_path(), '/') .'/', '', $src, 1);
+        // Convert to a file system path if using private files.
+        if (variable_get('file_downloads', FILE_DOWNLOADS_PUBLIC) == FILE_DOWNLOADS_PRIVATE && preg_match('/^system\/files\//', $local_path)) {
+          $local_path = file_directory_path() . '/' . preg_replace('/^system\/files\//', '', $local_path);
+        }
       }
       $local_path = urldecode($local_path);
     }
@@ -377,7 +416,6 @@ function image_resize_filter_process($images, $text, $settings) {
     }
 
     // Replace the existing image source with the resized image.
-    $base_path = base_path();
     // Set the image we're currently updating in the callback function.
     image_resize_fitler_update_tag(NULL, $image, $settings);
     $text = preg_replace_callback('/(<img[^>]*?src[ ]*=[ ]*")'. preg_quote($image['original'] ,'/') .'("[^>]*?)(\/?>)/', 'image_resize_fitler_update_tag', $text);
@@ -395,6 +433,7 @@ function image_resize_filter_process($images, $text, $settings) {
  *   available when this function is called from a regular expression.
  */
 function image_resize_fitler_update_tag($matches = NULL, $new_image = NULL, $new_settings = NULL) {
+  global $base_url, $base_path;
   static $image, $settings;
 
   $image = isset($new_image) ? $new_image : $image;
@@ -404,9 +443,22 @@ function image_resize_fitler_update_tag($matches = NULL, $new_image = NULL, $new
     return;
   }
 
+  $src = $image['destination'];
+  // Make the new file private if the original was private.
+  if (strpos($image['original'], 'system/files/') !== FALSE && variable_get('file_downloads', FILE_DOWNLOADS_PUBLIC) == FILE_DOWNLOADS_PRIVATE) {
+    $src = file_create_url($src);
+  }
+  else {
+    $src = $base_url . $base_path . $src;
+  }
+  // Strip the http:// from the path if the original did not include it.
+  if (!preg_match('/^http[s]?:\/\/'. preg_quote($_SERVER['HTTP_HOST']) .'/', $image['original'])) {
+    $src = preg_replace('/^http[s]?:\/\/'. preg_quote($_SERVER['HTTP_HOST']) .'/', '', $src);
+  }
+
   $output = '';
   $output .= $matches[1]; // The start of the tag.
-  $output .= base_path() . $image['destination']; // The new src.
+  $output .= $src; // The new src.
   $output .= $matches[2]; // The end of the tag, excluding the closing "/>".
 
   // Add height and width properties if they are missing from the original tag.
