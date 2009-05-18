@@ -256,7 +256,7 @@ function image_resize_filter_get_images($settings, $text) {
       // Only a style property found, we'll need to add a real height/width tag
       // to the HTML later. This specifically prevents problems with FCKeditor
       // that only adds style tags when resizing images.
-      elseif ($property_matches[1][$property_key] == ':'){
+      elseif (!empty($property_matches[1]) && $property_matches[1][$property_key] == ':'){
         $needs_property = TRUE;
       }
       ${$property} = !empty($property_matches[2][$property_key]) ? $property_matches[2][$property_key] : FALSE;
