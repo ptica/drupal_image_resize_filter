@@ -441,7 +441,7 @@ function image_resize_filter_process($images, $text, $settings) {
  *   available when this function is called from a regular expression.
  */
 function image_resize_fitler_update_tag($matches = NULL, $new_image = NULL, $new_settings = NULL) {
-  global $base_url, $base_path;
+  global $base_url;
   static $image, $settings;
 
   $image = isset($new_image) ? $new_image : $image;
@@ -457,7 +457,7 @@ function image_resize_fitler_update_tag($matches = NULL, $new_image = NULL, $new
     $src = file_create_url($src);
   }
   else {
-    $src = $base_url . $base_path . $src;
+    $src = $base_url . '/' . $src;
   }
   // Strip the http:// from the path if the original did not include it.
   if (!preg_match('/^http[s]?:\/\/'. preg_quote($_SERVER['HTTP_HOST']) .'/', $image['original'])) {
