@@ -18,7 +18,6 @@
  * Implementation of hook_filter().
  */
 function image_resize_filter_filter($op, $delta = 0, $format = -1, $text = '', $cache_id = 0) {
-  static $images = array();
 
   switch ($op) {
     case 'list':
@@ -428,7 +427,7 @@ function image_resize_filter_process($images, $text, $settings) {
     // Replace the existing image source with the resized image.
     // Set the image we're currently updating in the callback function.
     image_resize_filter_update_tag(NULL, $image, $settings);
-    $text = preg_replace_callback('/(<img[^>]*?src[ ]*=[ ]*")'. preg_quote($image['original'] ,'/') .'("[^>]*?)(\/?>)/', 'image_resize_filter_update_tag', $text);
+    $text = preg_replace_callback('/(<img[^>]*?src[ ]*=[ ]*")'. preg_quote($image['original'] ,'/') .'("[^>]*?)(\/?>)/', 'image_resize_filter_update_tag', $text, 1);
   }
   return $text;
 }
