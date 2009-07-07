@@ -429,6 +429,7 @@ function image_resize_filter_process($images, $text, $settings) {
       else {
         image_resize($image['local_path'], $image['destination'], $image['expected_size']['width'], $image['expected_size']['height']);
       }
+      @chmod($image['destination'], 0664);
     }
 
     // Replace the existing image source with the resized image.
