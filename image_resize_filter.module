@@ -421,7 +421,14 @@ function image_resize_filter_process($images, $text, $settings) {
 
     // Resize the local image.
     if (!file_exists($image['destination'])) {
-      image_resize($image['local_path'], $image['destination'], $image['expected_size']['width'], $image['expected_size']['height']);
+      if (module_exists('imageapi') && imageapi_default_toolkit()) {
+        $res = imageapi_image_open($image['local_path']);
+        imageapi_image_resize($res, $image['expected_size']['width'], $image['expected_size']['height']);
+        imageapi_image_close($res, $image['destination']);
+      }
+      else {
+        image_resize($image['local_path'], $image['destination'], $image['expected_size']['width'], $image['expected_size']['height']);
+      }
     }
 
     // Replace the existing image source with the resized image.
