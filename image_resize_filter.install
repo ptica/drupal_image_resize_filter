@@ -22,7 +22,7 @@ function image_resize_filter_uninstall() {
 function image_resize_filter_requirements($phase) {
   $requirements = array();
   $t = get_t();
-  if ($phase == 'install') {
+  if ($phase == 'install' && !defined('MAINTENANCE_MODE')) {
     if (function_exists('imageapi_default_toolkit') && !imageapi_default_toolkit() || !image_get_toolkit()) {
       $requirements['image_resize_filter'] = array(
         'title' => $t('Image resize filter'),
