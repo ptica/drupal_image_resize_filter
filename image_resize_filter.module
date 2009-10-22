@@ -226,13 +226,18 @@ function image_resize_filter_get_images($settings, $text) {
 
   // Find all image tags, ensuring that they have a src.
   $matches = array();
-  preg_match_all('/<img[^>]*?src[ ]*=[ ]*"([^"]+)"[^>]*>/', $text, $matches);
+  preg_match_all('/((<a [^>]*>)[ ]*)?(<img[^>]*?src[ ]*=[ ]*"([^"]+)"[^>]*>)/', $text, $matches);
 
   // Loop through matches and find if replacements are necessary.
-  // $matches[0]: All complete image tag matches.
-  // $matches[1]: The src value of each match.
-  foreach ($matches[0] as $key => $img_tag) {
-    $src = $matches[1][$key];
+  // $matches[0]: All complete image tags and preceeding anchors.
+  // $matches[1]: The anchor tag of each match (if any).
+  // $matches[2]: The anchor tag and trailing whitespace of each match (if any).
+  // $matches[3]: The complete img tag.
+  // $matches[4]: The src value of each match.
+  foreach ($matches[0] as $key => $match) {
+    $has_link = (bool) $matches[1][$key];
+    $img_tag = $matches[3][$key];
+    $src = $matches[4][$key];
 
     $width = NULL;
     $height = NULL;
@@ -363,6 +368,7 @@ function image_resize_filter_get_images($settings, $text) {
       'actual_size' => array('width' => $image_size[0], 'height' => $image_size[1]),
       'add_properties' => array('width' => $needs_width, 'height' => $needs_height),
       'title' => $title,
+      'has_link' => $has_link,
       'original' => $src,
       'location' => $location,
       'local_path' => $local_path,
@@ -492,7 +498,7 @@ function image_resize_filter_update_tag($matches = NULL, $new_image = NULL, $new
   $output .= $image['add_properties']['height'] ? ' height="'. $image['expected_size']['height'] .'"' : '';
 
   $output .= $matches[3]; // The closing "/>".
-  if ($settings['link']) {
+  if ($settings['link'] && !$image['has_link']) {
     $class = !empty($settings['class']) ? ' class="'. $settings['class'] .'"' : '';
     $rel = !empty($settings['rel']) ? ' rel="'. $settings['rel'] .'"' : '';
     $title = !empty($image['title']) ? ' title="'. $image['title'] .'"' : '';
