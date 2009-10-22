@@ -267,6 +267,14 @@ function image_resize_filter_get_images($settings, $text) {
       continue;
     }
 
+    // Find the image title if any.
+    $title = NULL;
+    $title_matches = array();
+    preg_match('/title[ ]*=[ ]*"([^"]+)"/', $img_tag, $title_matches);
+    if (isset($title_matches[1])) {
+      $title = $title_matches[1];
+    }
+
     // Check the image extension.
     $extension_matches = array();
     preg_match('/.([a-zA-Z0-9]+)$/', $src, $extension_matches);
@@ -354,6 +362,7 @@ function image_resize_filter_get_images($settings, $text) {
       'expected_size' => array('width' => $width, 'height' => $height),
       'actual_size' => array('width' => $image_size[0], 'height' => $image_size[1]),
       'add_properties' => array('width' => $needs_width, 'height' => $needs_height),
+      'title' => $title,
       'original' => $src,
       'location' => $location,
       'local_path' => $local_path,
@@ -486,7 +495,8 @@ function image_resize_filter_update_tag($matches = NULL, $new_image = NULL, $new
   if ($settings['link']) {
     $class = !empty($settings['class']) ? ' class="'. $settings['class'] .'"' : '';
     $rel = !empty($settings['rel']) ? ' rel="'. $settings['rel'] .'"' : '';
-    $output = '<a href="'. $image['original'] .'"'. $class . $rel . '>'. $output .'</a>';
+    $title = !empty($image['title']) ? ' title="'. $image['title'] .'"' : '';
+    $output = '<a href="'. $image['original'] .'"'. $title . $class . $rel . '>'. $output .'</a>';
   }
 
   return $output;
