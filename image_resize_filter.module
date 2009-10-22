@@ -299,8 +299,8 @@ function image_resize_filter_get_images($settings, $text) {
         // Remove the http:// and base path.
         $local_path = preg_replace('/(http[s]?:\/\/'. preg_quote($_SERVER['HTTP_HOST'], '/') .')?'. preg_quote(base_path(), '/') .'/', '', $src, 1);
         // Convert to a file system path if using private files.
-        if (variable_get('file_downloads', FILE_DOWNLOADS_PUBLIC) == FILE_DOWNLOADS_PRIVATE && preg_match('/^system\/files\//', $local_path)) {
-          $local_path = file_directory_path() . '/' . preg_replace('/^system\/files\//', '', $local_path);
+        if (variable_get('file_downloads', FILE_DOWNLOADS_PUBLIC) == FILE_DOWNLOADS_PRIVATE && preg_match('/^(\?q\=)?system\/files\//', $local_path)) {
+          $local_path = file_directory_path() . '/' . preg_replace('/^(\?q\=)?system\/files\//', '', $local_path);
         }
       }
       $local_path = urldecode($local_path);
