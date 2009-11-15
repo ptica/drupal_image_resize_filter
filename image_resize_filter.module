@@ -33,7 +33,7 @@ function image_resize_filter_filter($op, $delta = 0, $format = -1, $text = '', $
       $settings['link'] = variable_get('image_resize_filter_link_'. $format, 0);
       $settings['class'] = variable_get('image_resize_filter_link_class_'. $format, '');
       $settings['rel'] = variable_get('image_resize_filter_link_rel_'. $format, '');
-      $settings['image_locations'] = variable_get('image_resize_filter_image_locations_'. $format, array('local'));
+      $settings['image_locations'] = array_filter(variable_get('image_resize_filter_image_locations_'. $format, array('local')));
       $images = image_resize_filter_get_images($settings, $text);
       return image_resize_filter_process($images, $text, $settings);
 
