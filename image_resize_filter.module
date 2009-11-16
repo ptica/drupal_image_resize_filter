@@ -325,7 +325,13 @@ function image_resize_filter_get_images($settings, $text) {
       $imagecache_args = explode('/', $imagecache_path);
       $preset_name = array_shift($imagecache_args);
       $original_path = implode('/', $imagecache_args);
-      if ($preset = imagecache_preset_by_name($preset_name)) {
+      // ImageCache can resize images both inside and outside of the files
+      // directory. If the image doesn't exist at the given path, check inside
+      // the files directory.
+      if (!file_exists($original_path)) {
+        $original_path = file_directory_path() . '/' . $original_path;
+      }
+      if (file_exists($original_path) && $preset = imagecache_preset_by_name($preset_name)) {
         imagecache_build_derivative($preset['actions'], $original_path, imagecache_create_path($preset_name, $original_path));
       }
     }
