@@ -303,9 +303,23 @@ function image_resize_filter_get_images($settings, $text) {
       if (strpos($src, '.') !== 0) {
         // Remove the http:// and base path.
         $local_path = preg_replace('/(http[s]?:\/\/'. preg_quote($_SERVER['HTTP_HOST'], '/') .')?'. preg_quote(base_path(), '/') .'/', '', $src, 1);
+
+        // Build a list of acceptable language prefixes.
+        $lang_codes = '';
+        if (in_array(variable_get('language_negotiation', LANGUAGE_NEGOTIATION_NONE), array(LANGUAGE_NEGOTIATION_PATH, LANGUAGE_NEGOTIATION_PATH_DEFAULT))) {
+          $languages = language_list();
+          $lang_codes = array();
+          foreach ($languages as $key => $language) {
+            if ($language->prefix) {
+              $lang_codes[$key] = preg_quote($language->prefix, '!');
+            }
+          }
+          $lang_codes = $lang_codes ? '((' . implode('|', $lang_codes) . ')/)?' : '';
+        }
+
         // Convert to a file system path if using private files.
-        if (variable_get('file_downloads', FILE_DOWNLOADS_PUBLIC) == FILE_DOWNLOADS_PRIVATE && preg_match('/^(\?q\=)?system\/files\//', $local_path)) {
-          $local_path = file_directory_path() . '/' . preg_replace('/^(\?q\=)?system\/files\//', '', $local_path);
+        if (variable_get('file_downloads', FILE_DOWNLOADS_PUBLIC) == FILE_DOWNLOADS_PRIVATE && preg_match('!^(\?q\=)?' . $lang_codes . 'system/files/!', $local_path)) {
+          $local_path = file_directory_path() . '/' . preg_replace('!^(\?q\=)?' . $lang_codes . 'system/files/!', '', $local_path);
         }
       }
       $local_path = urldecode($local_path);
