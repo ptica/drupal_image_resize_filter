@@ -322,7 +322,7 @@ function image_resize_filter_get_images($settings, $text) {
           $local_path = file_directory_path() . '/' . preg_replace('!^(\?q\=)?' . $lang_codes . 'system/files/!', '', $local_path);
         }
       }
-      $local_path = urldecode($local_path);
+      $local_path = rawurldecode($local_path);
     }
 
     // If this is an ImageCache preset, generate the source image if necessary.
