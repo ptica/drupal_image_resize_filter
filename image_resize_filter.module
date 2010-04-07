@@ -131,9 +131,8 @@ function image_resize_filter_form($format) {
   $form['image_resize']['image_resize_filter_image_locations_'. $format] = array(
     '#type' => 'checkboxes',
     '#title' => t('Resize images stored'),
-    '#options' => array('local' => t('Locally'), 'remote' => t('On remote servers')),
+    '#options' => array('local' => t('Locally'), 'remote' => t('On remote servers (note: this copies <em>all</em> remote images locally)')),
     '#default_value' => variable_get('image_resize_filter_image_locations_'. $format, array('local')),
-    '#required' => TRUE,
     '#description' => t('This option will determine which images will be analyzed for &lt;img&gt; tag differences. Enabling resizing of remote images can have performance impacts, as all images in the filtered text needs to be transfered via HTTP each time the filter cache is cleared.'),
   );
 
@@ -378,8 +377,11 @@ function image_resize_filter_get_images($settings, $text) {
       $width = round($ratio * $height);
     }
 
-    // Finally, if width and heights match up, don't do anything.
-    if ($actual_width == $width && $actual_height == $height) {
+    // Don't do anything for local images that are the right size already.
+    // Save remote images for downloading locally unless they are 1x1 pixels,
+    // which are frequently used in tracking scripts.
+    if (($location == 'local' && $actual_width == $width && $actual_height == $height) ||
+        ($location == 'remote' && $actual_width = 1 && $actual_height = 1)) {
       image_resize_filter_delete_temp_file($location, $local_path);
       continue;
     }
@@ -413,7 +415,8 @@ function image_resize_filter_get_images($settings, $text) {
       continue;
     }
 
-    // If getting this far, the image exists and is not the right size.
+    // If getting this far, the image exists and is not the right size or needs
+    // to be saved locally from a remote server.
     // Add all information to a list of images that need resizing.
     $images[] = array(
       'expected_size' => array('width' => $width, 'height' => $height),
@@ -474,15 +477,23 @@ function image_resize_filter_process($images, $text, $settings) {
       $file_check_directory($check_directory, FILE_CREATE_DIRECTORY);
     }
 
-    // Resize the local image.
     if (!file_exists($image['destination'])) {
-      if (module_exists('imageapi') && imageapi_default_toolkit()) {
-        $res = imageapi_image_open($image['local_path']);
-        imageapi_image_resize($res, $image['expected_size']['width'], $image['expected_size']['height']);
-        imageapi_image_close($res, $image['destination']);
+      // Move remote images into place if they are already the right size.
+      if ($image['location'] == 'remote' && $image['expected_size']['width'] == $image['actual_size']['width'] && $image['expected_size']['height'] == $image['actual_size']['height']) {
+        $handle = fopen($image['destination'], 'w');
+        fwrite($handle, file_get_contents($image['local_path']));
+        fclose($handle);
       }
+      // Resize the local image if the sizes don't match.
       else {
-        image_resize($image['local_path'], $image['destination'], $image['expected_size']['width'], $image['expected_size']['height']);
+        if (module_exists('imageapi') && imageapi_default_toolkit()) {
+          $res = imageapi_image_open($image['local_path']);
+          imageapi_image_resize($res, $image['expected_size']['width'], $image['expected_size']['height']);
+          imageapi_image_close($res, $image['destination']);
+        }
+        else {
+          image_resize($image['local_path'], $image['destination'], $image['expected_size']['width'], $image['expected_size']['height']);
+        }
       }
       @chmod($image['destination'], 0664);
     }
