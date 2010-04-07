@@ -407,6 +407,7 @@ function image_resize_filter_get_images($settings, $text) {
       'expected_size' => array('width' => $width, 'height' => $height),
       'actual_size' => array('width' => $image_size[0], 'height' => $image_size[1]),
       'add_properties' => array('width' => $needs_width, 'height' => $needs_height),
+      'img_tag' => $img_tag,
       'title' => $title,
       'has_link' => $has_link,
       'original' => $src,
@@ -488,7 +489,7 @@ function image_resize_filter_process($images, $text, $settings) {
     // Replace the existing image source with the resized image.
     // Set the image we're currently updating in the callback function.
     image_resize_filter_update_tag(NULL, $image, $settings);
-    $text = preg_replace_callback('/(<img[^>]*?src[ ]*=[ ]*")'. preg_quote($image['original'] ,'/') .'("[^>]*?)(\/?>)/i', 'image_resize_filter_update_tag', $text, 1);
+    $text = preg_replace_callback('/(<img[^>]*?src[ ]*=[ ]*")'. preg_quote($image['original'] ,'/') .'("[^>]*?)(\/?>)/i', 'image_resize_filter_update_tag', $text);
   }
   return $text;
 }
@@ -511,6 +512,12 @@ function image_resize_filter_update_tag($matches = NULL, $new_image = NULL, $new
 
   if (!isset($matches)) {
     return;
+  }
+
+  // Do not do replacements if the image tag doesn't match exactly. This can
+  // happen if the same image is in the same post multiple times.
+  if ($matches[0] != $image['img_tag']) {
+    return $matches[0];
   }
 
   $src = $image['destination'];
