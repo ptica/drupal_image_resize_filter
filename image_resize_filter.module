@@ -248,7 +248,7 @@ function image_resize_filter_get_images($settings, $text) {
     // have both attributes, match individually for height and width.
     foreach (array('width', 'height') as $property) {
       $property_matches = array();
-      preg_match_all('/'. $property .'[ ]*([=:])[ ]*"?([0-9]+)"?/i', $img_tag, $property_matches);
+      preg_match_all('/[ \'";]'. $property .'[ ]*([=:])[ ]*"?([0-9]+)"?/i', $img_tag, $property_matches);
       // In the odd scenario there is both a style="width: xx" and a width="xx"
       // tag, base our calculations off the style tag, since that's what the
       // browser will display.
