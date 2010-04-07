@@ -342,16 +342,26 @@ function image_resize_filter_get_images($settings, $text) {
       }
     }
 
-    // Get the image size.
-    if ($location == 'local') {
-      $image_size = @getimagesize($local_path);
+    // If this is a remote image, retreive it to check its size.
+    if ($location == 'remote') {
+      $result = drupal_http_request($src);
+      if ($result->code == 200) {
+        $tmp_file = tempnam(file_directory_temp(), 'image_resize_filter_');
+        $handle = fopen($tmp_file, 'w');
+        fwrite($handle, $result->data);
+        fclose($handle);
+        $local_path = $tmp_file;
+      }
     }
-    else {
-      $image_size = @getimagesize($src);
+
+    // Get the image size.
+    if (is_file($local_path)) {
+      $image_size = @getimagesize($local_path);
     }
 
     // All this work and the image isn't even there. Bummer. Next image please.
-    if ($image_size == FALSE) {
+    if (empty($image_size)) {
+      image_resize_filter_delete_temp_file($location, $local_path);
       continue;
     }
 
@@ -370,6 +380,7 @@ function image_resize_filter_get_images($settings, $text) {
 
     // Finally, if width and heights match up, don't do anything.
     if ($actual_width == $width && $actual_height == $height) {
+      image_resize_filter_delete_temp_file($location, $local_path);
       continue;
     }
 
@@ -398,6 +409,7 @@ function image_resize_filter_get_images($settings, $text) {
 
     // If we're not certain we can resize this image, skip it.
     if (!isset($extension) || !in_array(strtolower($extension), array('png', 'jpg', 'jpeg', 'gif'))) {
+      image_resize_filter_delete_temp_file($location, $local_path);
       continue;
     }
 
@@ -438,20 +450,9 @@ function image_resize_filter_process($images, $text, $settings) {
   $local_file_path = '';
   foreach ($images as $image) {
     // Copy remote images locally.
-    if ($image['location'] == 'remote') {
-      $result = drupal_http_request($image['original']);
-      if ($result->code == 200) {
-        $tmp_file = tempnam(file_directory_temp(), 'image_resize_filter_');
-        $handle = fopen($tmp_file, 'w');
-        fwrite($handle, $result->data);
-        fclose($handle);
-        $local_file_path = 'resize/remote/'. md5($result->data) .'-'. $image['expected_size']['width'] .'x'. $image['expected_size']['height'] .'.'. $image['extension'];
-        $image['local_path'] = $tmp_file;
-        $image['destination'] = $file_directory_path .'/'. $local_file_path;
-      }
-      else {
-        continue;
-      }
+    if ($image['location'] == 'remote') {;
+      $local_file_path = 'resize/remote/'. md5(file_get_contents($image['local_path'])) .'-'. $image['expected_size']['width'] .'x'. $image['expected_size']['height'] .'.'. $image['extension'];
+      $image['destination'] = $file_directory_path .'/'. $local_file_path;
     }
     else {
       $path_info = image_resize_filter_pathinfo($image['local_path']);
@@ -485,6 +486,9 @@ function image_resize_filter_process($images, $text, $settings) {
       }
       @chmod($image['destination'], 0664);
     }
+
+    // Delete our temporary file if this is a remote image.
+    image_resize_filter_delete_temp_file($image['location'], $image['local_path']);
 
     // Replace the existing image source with the resized image.
     // Set the image we're currently updating in the callback function.
@@ -551,6 +555,15 @@ function image_resize_filter_update_tag($matches = NULL, $new_image = NULL, $new
   }
 
   return $output;
+}
+
+/**
+ * A short-cut function to delete temporary remote images.
+ */
+function image_resize_filter_delete_temp_file($source, $filepath) {
+  if ($source == 'remote' && is_file($filepath)) {
+    @unlink($filepath);
+  }
 }
 
 /**
