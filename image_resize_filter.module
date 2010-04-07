@@ -84,7 +84,7 @@ function image_resize_filter_theme() {
 function image_resize_filter_file_download($filepath) {
   // If this is a resized image, use the same access as the original image.
   $matches = array();
-  if (preg_match('/^resize\/(.*)?-\d+x\d+\.(png|jpg|jpeg|gif)$/i', $filepath, $matches)) {
+  if (preg_match('/^resize\/(.*)?-\d+x\d+(\.png|\.jpg|\.jpeg|\.gif)$/i', $filepath, $matches)) {
     $headers = module_invoke_all('file_download', $matches[1] . $matches[2]);
     if (in_array(-1, $headers)) {
       return -1;
