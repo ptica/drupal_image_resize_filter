@@ -240,8 +240,8 @@ function image_resize_filter_get_images($settings, $text) {
 
     $width = NULL;
     $height = NULL;
-    $needs_height = FALSE;
-    $needs_width = FALSE;
+    $needs_width = TRUE;
+    $needs_height = TRUE;
 
     // Because we don't know the order of the attributes and images might not
     // have both attributes, match individually for height and width.
@@ -252,8 +252,8 @@ function image_resize_filter_get_images($settings, $text) {
       // tag, base our calculations off the style tag, since that's what the
       // browser will display.
       $property_key = 0;
-      $needs_property = FALSE;
       if (count($property_matches[1]) > 1) {
+        $needs_property = FALSE;
         $property_key = array_search(':', $property_matches[1]);
       }
       // Only a style property found, we'll need to add a real height/width tag
@@ -263,12 +263,7 @@ function image_resize_filter_get_images($settings, $text) {
         $needs_property = TRUE;
       }
       ${$property} = !empty($property_matches[2][$property_key]) ? $property_matches[2][$property_key] : FALSE;
-      ${'needs_'. $property} = $needs_property;
-    }
-
-    // If height and width are both missing, nothing to do here.
-    if (!$width && !$height) {
-      continue;
+      ${'needs_'. $property} = isset($needs_property) ? $needs_property : ${'needs_'. $property};
     }
 
     // Find the image title if any.
@@ -368,6 +363,10 @@ function image_resize_filter_get_images($settings, $text) {
     $actual_height = $image_size[1];
 
     // If either height or width is missing, calculate the other.
+    if (!$width && !$height) {
+      $width = $actual_width;
+      $height = $actual_height;
+    }
     if (!$height) {
       $ratio = $actual_height/$actual_width;
       $height = round($ratio * $width);
@@ -377,11 +376,16 @@ function image_resize_filter_get_images($settings, $text) {
       $width = round($ratio * $height);
     }
 
-    // Don't do anything for local images that are the right size already.
-    // Save remote images for downloading locally unless they are 1x1 pixels,
-    // which are frequently used in tracking scripts.
-    if (($location == 'local' && $actual_width == $width && $actual_height == $height) ||
-        ($location == 'remote' && $actual_width = 1 && $actual_height = 1)) {
+    // Determine if this image requires a resize.
+    $resize = ($actual_width != $width || $actual_height != $height);
+
+    // Skip processing if these conditions are met:
+    // - The image already has both height and width attributes.
+    // - The image is local and is already the right size.
+    // - The image is remote and a 1x1 pixel tracking image.
+    if ((!$needs_width && !$needs_height) &&
+        (($location == 'local' && !$resize) ||
+         ($location == 'remote' && $actual_width == 1 && $actual_height == 1))) {
       image_resize_filter_delete_temp_file($location, $local_path);
       continue;
     }
@@ -422,6 +426,7 @@ function image_resize_filter_get_images($settings, $text) {
       'expected_size' => array('width' => $width, 'height' => $height),
       'actual_size' => array('width' => $image_size[0], 'height' => $image_size[1]),
       'add_properties' => array('width' => $needs_width, 'height' => $needs_height),
+      'resize' => $resize,
       'img_tag' => $img_tag,
       'title' => $title,
       'has_link' => $has_link,
@@ -457,6 +462,10 @@ function image_resize_filter_process($images, $text, $settings) {
       $local_file_path = 'resize/remote/'. md5(file_get_contents($image['local_path'])) .'-'. $image['expected_size']['width'] .'x'. $image['expected_size']['height'] .'.'. $image['extension'];
       $image['destination'] = $file_directory_path .'/'. $local_file_path;
     }
+    // Destination and local path are the same if we're just adding attributes.
+    elseif (!$image['resize']) {
+      $image['destination'] = $image['local_path'];
+    }
     else {
       $path_info = image_resize_filter_pathinfo($image['local_path']);
       $local_file_dir = preg_replace('/^'. preg_quote($file_directory_path, '/') .'\/?/', '', $path_info['dirname']);
@@ -479,13 +488,13 @@ function image_resize_filter_process($images, $text, $settings) {
 
     if (!file_exists($image['destination'])) {
       // Move remote images into place if they are already the right size.
-      if ($image['location'] == 'remote' && $image['expected_size']['width'] == $image['actual_size']['width'] && $image['expected_size']['height'] == $image['actual_size']['height']) {
+      if ($image['location'] == 'remote' && !$image['resize']) {
         $handle = fopen($image['destination'], 'w');
         fwrite($handle, file_get_contents($image['local_path']));
         fclose($handle);
       }
       // Resize the local image if the sizes don't match.
-      else {
+      elseif ($image['resize']) {
         if (module_exists('imageapi') && imageapi_default_toolkit()) {
           $res = imageapi_image_open($image['local_path']);
           imageapi_image_resize($res, $image['expected_size']['width'], $image['expected_size']['height']);
@@ -558,7 +567,7 @@ function image_resize_filter_update_tag($matches = NULL, $new_image = NULL, $new
   $output .= $image['add_properties']['height'] ? ' height="'. $image['expected_size']['height'] .'"' : '';
 
   $output .= $matches[3]; // The closing "/>".
-  if ($settings['link'] && !$image['has_link']) {
+  if ($image['resize'] && $settings['link'] && !$image['has_link']) {
     $class = !empty($settings['class']) ? ' class="'. $settings['class'] .'"' : '';
     $rel = !empty($settings['rel']) ? ' rel="'. $settings['rel'] .'"' : '';
     $title = !empty($image['title']) ? ' title="'. $image['title'] .'"' : '';
