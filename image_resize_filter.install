@@ -23,7 +23,7 @@ function image_resize_filter_requirements($phase) {
   $requirements = array();
   $t = get_t();
   if ($phase == 'install' && function_exists('image_get_toolkit')) {
-    if (function_exists('imageapi_default_toolkit') && !imageapi_default_toolkit() || !image_get_toolkit()) {
+    if (!(image_get_toolkit() || (function_exists('imageapi_default_toolkit') && imageapi_default_toolkit()))) {
       $requirements['image_resize_filter'] = array(
         'title' => $t('Image resize filter'),
         'description' => $t('Image resize filter requires at least one active image toolkit on your server.'),
