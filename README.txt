@@ -11,32 +11,38 @@ This module Built By Robots: http://www.lullabot.com.
 
 Dependencies
 ------------
- * Drupal 5 or 6
+ * Drupal 6 or 7
 
 Install
 -------
 1) Place the entire image_resize_filter directory in sites/all/modules. Then
    enable the module in Drupal.
 
-2) Visit the Adminsiter->Site configuration->Input formats
-   (admin/settings/filters). Click "configure" next to the input format you want
-   to enable the image resize filter on.
+2) Visit the Adminsiter->Configuration->Content authoring->text formats
+   (admin/config/content/formats). Click "configure" next to the text format you
+   want to enable the image resize filter on.
 
-3) Check the box for "Image resize filter" under the list of filters and save
-   the configuration.
+3) Check the box for "Image resize filter" under the list of filters.
 
-4) IMPORTANT: Click the "Rearrange" tab to check the order of the filters.
+4) IMPORTANT: Re-order your enabled filters under "Filter processing order".
 
-   If using the Image Resize Filter on the "Filtered HTML" input format, you
+   If using the Image Resize Filter on the "Filtered HTML" text format, you
    MUST ensure A) that the <img> tag is in the list of allowed tags and B) The
    "Image resize filter" is run BEFORE the "HTML filter".
 
    If using the Image Resize Filter with BBCode or some other non-HTML filter,
    the "Image resize filter" must be run AFTER the BBCode filter.
 
-5) Optional. Click "configure" next to the input format the image resize filter
-   has been enabled on, then click the "Configure" tab so set additional
-   configuration for the the image resize filter.
+5) Optional. Click the Image resize filter tab underneath "Filter settings" to
+   set additional configuration for the the image resize filter.
+
+Identifying problems
+--------------------
+It is important to understand that Image Resize Filter has absolutely no effect
+on the content creation form. If you are having trouble resizing an image in a
+WYSIWYG or editing a piece of content, DO NOT file an issue with Image Resize
+Filter. This module is only responsible for the display of output and has
+absolutely no effect on editing or creating new content.
 
 Support
 -------
