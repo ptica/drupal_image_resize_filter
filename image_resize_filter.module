@@ -298,7 +298,7 @@ function image_resize_filter_get_images($settings, $text) {
 
     // Determine if this is a local or remote file.
     $location = 'unknown';
-    if (strpos($src, '/') === 0 || strpos($src, '.') === 0) {
+    if (strpos($src, '/') === 0) {
       $location = 'local';
     }
     elseif (preg_match('/http[s]?:\/\/' . preg_quote($_SERVER['HTTP_HOST'], '/') . '/', $src)) {
