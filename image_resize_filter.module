@@ -253,6 +253,7 @@ function image_resize_filter_get_images($settings, $text) {
     $height = NULL;
     $needs_width = TRUE;
     $needs_height = TRUE;
+    $image_size = NULL;
 
     // Because we don't know the order of the attributes and images might not
     // have both attributes, match individually for height and width.
