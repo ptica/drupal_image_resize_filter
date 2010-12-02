@@ -317,27 +317,25 @@ function image_resize_filter_get_images($settings, $text) {
     // Convert the URL to a local path.
     $local_path = NULL;
     if ($location == 'local') {
-      if (strpos($src, '.') !== 0) {
-        // Remove the http:// and base path.
-        $local_path = preg_replace('/(http[s]?:\/\/' . preg_quote($_SERVER['HTTP_HOST'], '/') . ')?' . preg_quote(base_path(), '/') . '/', '', $src, 1);
+      // Remove the http:// and base path.
+      $local_path = preg_replace('/(http[s]?:\/\/' . preg_quote($_SERVER['HTTP_HOST'], '/') . ')?' . preg_quote(base_path(), '/') . '/', '', $src, 1);
 
-        // Build a list of acceptable language prefixes.
-        $lang_codes = '';
-        if (array_key_exists('locale-url', variable_get('language_negotiation_language', array())) && variable_get('locale_language_negotiation_url_part', 0) == 0) {
-          $languages = language_list();
-          $lang_codes = array();
-          foreach ($languages as $key => $language) {
-            if ($language->prefix) {
-              $lang_codes[$key] = preg_quote($language->prefix, '!');
-            }
+      // Build a list of acceptable language prefixes.
+      $lang_codes = '';
+      if (array_key_exists('locale-url', variable_get('language_negotiation_language', array())) && variable_get('locale_language_negotiation_url_part', 0) == 0) {
+        $languages = language_list();
+        $lang_codes = array();
+        foreach ($languages as $key => $language) {
+          if ($language->prefix) {
+            $lang_codes[$key] = preg_quote($language->prefix, '!');
           }
-          $lang_codes = $lang_codes ? '((' . implode('|', $lang_codes) . ')/)?' : '';
         }
+        $lang_codes = $lang_codes ? '((' . implode('|', $lang_codes) . ')/)?' : '';
+      }
 
-        // Convert to a file system path if using private files.
-        if (preg_match('!^(\?q\=)?' . $lang_codes . 'system/files/!', $local_path)) {
-          $local_path = file_directory_path('private') . '/' . preg_replace('!^(\?q\=)?' . $lang_codes . 'system/files/!', '', $local_path);
-        }
+      // Convert to a file system path if using private files.
+      if (preg_match('!^(\?q\=)?' . $lang_codes . 'system/files/!', $local_path)) {
+        $local_path = file_directory_path('private') . '/' . preg_replace('!^(\?q\=)?' . $lang_codes . 'system/files/!', '', $local_path);
       }
       $local_path = rawurldecode($local_path);
     }
