@@ -97,15 +97,15 @@ function image_resize_filter_theme() {
 function image_resize_filter_file_download($uri) {
   // If this is a resized image, use the same access as the original image.
   $matches = array();
-  if (preg_match('/^resize\/(.*)?-\d+x\d+(\.png|\.jpg|\.jpeg|\.gif)$/i', $uri, $matches)) {
-    $headers = module_invoke_all('file_download', $matches[1] . $matches[2]);
+  if (preg_match('/^([a-z0-9\-_]+:\/\/)resize\/(.*)?-\d+x\d+(\.png|\.jpg|\.jpeg|\.gif)$/i', $uri, $matches)) {
+    $headers = module_invoke_all('file_download', $matches[1] . $matches[2] . $matches[3]);
     if (in_array(-1, $headers)) {
       return -1;
     }
     if (count($headers)) {
       return array(
-        'Content-Type: ' . file_get_mimetype($uri),
-        'Content-Length: ' . filesize($uri),
+        'Content-Type' => file_get_mimetype($uri),
+        'Content-Length' => filesize($uri),
       );
     }
   }
@@ -323,27 +323,28 @@ function image_resize_filter_get_images($settings, $text) {
         $lang_codes = $lang_codes ? '((' . implode('|', $lang_codes) . ')/)?' : '';
       }
 
+      // Convert to a public file system URI.
+      $directory_path = file_stream_wrapper_get_instance_by_scheme('public')->getDirectoryPath() . '/';
+      if (preg_match('!^' . preg_quote($directory_path, '!') . '!', $local_path)) {
+        $local_path = 'public://' . preg_replace('!^' . preg_quote($directory_path, '!') . '!', '', $local_path);
+      }
       // Convert to a file system path if using private files.
-      if (preg_match('!^(\?q\=)?' . $lang_codes . 'system/files/!', $local_path)) {
-        $local_path = file_directory_path('private') . '/' . preg_replace('!^(\?q\=)?' . $lang_codes . 'system/files/!', '', $local_path);
+      elseif (preg_match('!^(\?q\=)?' . $lang_codes . 'system/files/!', $local_path)) {
+        $local_path = 'private://' . preg_replace('!^(\?q\=)?' . $lang_codes . 'system/files/!', '', $local_path);
       }
       $local_path = rawurldecode($local_path);
     }
 
-    // If this is an ImageCache preset, generate the source image if necessary.
-    if ($location == 'local' && !file_exists($local_path) && strpos($local_path, 'styles/') !== FALSE && function_exists('image_style_url')) {
-      $imagecache_path = preg_replace('/^' . preg_quote(file_directory_path(), '/') . '\/imagecache\//', '', $local_path);
-      $imagecache_args = explode('/', $imagecache_path);
-      $preset_name = array_shift($imagecache_args);
-      $original_path = implode('/', $imagecache_args);
-      // ImageCache can resize images both inside and outside of the files
-      // directory. If the image doesn't exist at the given path, check inside
-      // the files directory.
-      if (!file_exists($original_path)) {
-        $original_path = file_directory_path() . '/' . $original_path;
-      }
-      if (file_exists($original_path) && $preset = imagecache_preset_by_name($preset_name)) {
-        imagecache_build_derivative($preset['actions'], $original_path, imagecache_create_path($preset_name, $original_path));
+    // If this is an Image preset, generate the source image if necessary.
+    // Formatted as "uri://styles/[style-name]/[schema-name]/[original-path]".
+    $image_style_matches = array();
+    $scheme = file_uri_scheme($local_path);
+    if (!file_exists($local_path) && preg_match('!^' . $scheme . '://styles/([a-z0-9_\-]+)/([a-z0-9_\-]+)/(.*)$!i', $local_path, $image_style_matches) && function_exists('image_style_path')) {
+      $style_name = $image_style_matches[1];
+      $original_path = $scheme . '://' . $image_style_matches[3];
+      if ($style = image_style_load($style_name)) {
+        $derivative_path = image_style_path($style_name, $original_path);
+        image_style_create_derivative($style, $original_path, $local_path);
       }
     }
 
@@ -351,7 +352,7 @@ function image_resize_filter_get_images($settings, $text) {
     if ($location == 'remote') {
       $result = drupal_http_request($src);
       if ($result->code == 200) {
-        $tmp_file = tempnam(file_directory_path('temp'), 'image_resize_filter_');
+        $tmp_file = drupal_tempnam('temporary://', 'image_resize_filter_');
         $handle = fopen($tmp_file, 'w');
         fwrite($handle, $result->data);
         fclose($handle);
@@ -549,7 +550,7 @@ function image_resize_filter_image_tag($image = NULL, $settings = NULL) {
   }
 
   // Theme the output and return.
-  return theme('image_resize_filter_image', $image, $settings);
+  return theme('image_resize_filter_image', array('image' => $image, 'settings' => $settings));
 }
 
 /**
@@ -621,29 +622,11 @@ function image_resize_filter_delete_derivatives($original_uri) {
  * Delete the entire set of cached images.
  */
 function image_resize_filter_delete_all() {
-  $directory = file_directory_path() . '/resize';
-  image_resize_filter_delete_recursive($directory);
+  foreach (file_get_stream_wrappers() as $scheme => $stream_wrapper) {
+    $directory = $scheme . '://resize';
+    file_unmanaged_delete_recursive($directory);
+  }
   cache_clear_all('*', 'cache_filter');
-}
-
-/**
- * Recursive deletion function for clearing out resized images directory.
- */
-function image_resize_filter_delete_recursive($path) {
-  if (is_file($path) || is_link($path)) {
-    unlink($path);
-  }
-  elseif (is_dir($path)) {
-    $dir = dir($path);
-    while (($entry = $dir->read()) !== false) {
-      if ($entry == '.' || $entry == '..') {
-        continue;
-      }
-      $entry_path = $path . '/' . $entry;
-      image_resize_filter_delete_recursive($entry_path);
-    }
-    rmdir($path);
-  }
 }
 
 /**
@@ -658,8 +641,9 @@ function image_resize_filter_pathinfo($uri) {
 
   if (empty($info['scheme'])) {
     foreach (file_get_stream_wrappers() as $scheme => $stream_wrapper) {
+      $scheme_base_path = file_stream_wrapper_get_instance_by_scheme($scheme)->getDirectoryPath();
       $matches = array();
-      if (preg_match('/^' . preg_quote(file_directory_path($scheme), '/') . '\/?(.*)/', $info['dirname'], $matches)) {
+      if (preg_match('/^' . preg_quote($scheme_base_path, '/') . '\/?(.*)/', $info['dirname'], $matches)) {
         $info['scheme'] = $scheme;
         $info['dirname'] = $scheme . '://' . $matches[1];
         break;
