@@ -544,8 +544,8 @@ function image_resize_filter_image_tag($image = NULL, $settings = NULL) {
     if (!empty($settings['rel'])) {
       $image['link']['attributes']['rel'] = $settings['rel'];
     }
-    if (!empty($image['title'])) {
-      $image['link']['attributes']['title'] = $image['title'];
+    if (!empty($image['attributes']['title'])) {
+      $image['link']['attributes']['title'] = $image['attributes']['title'];
     }
   }
 
