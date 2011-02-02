@@ -466,7 +466,7 @@ function image_resize_filter_process_images($images, $text, $settings) {
 
   foreach ($images as $image) {
     // Copy remote images locally.
-    if ($image['location'] == 'remote') {;
+    if ($image['location'] == 'remote') {
       $local_file_path = 'resize/remote/' . md5(file_get_contents($image['local_path'])) . '-' . $image['expected_size']['width'] . 'x' . $image['expected_size']['height'] . '.'. $image['extension'];
       $image['destination'] = variable_get('file_default_scheme', 'public') . '://' . $local_file_path;
     }
