@@ -1,4 +1,3 @@
-// $Id$
 
 This filter makes it easy to resize images, especially when combined with a
 WYSIWYG editor such as tinyMCE or FCKeditor. Users never have to worry about
