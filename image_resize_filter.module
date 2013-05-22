@@ -426,6 +426,21 @@ function image_resize_filter_get_images($settings, $text) {
       image_resize_filter_delete_temp_file($location, $local_path);
       continue;
     }
+    
+    // move it, will need it for original local links
+    if ($location == 'remote') {
+    	$original_local_path = 'resize/remote/' . md5(file_get_contents($local_path)) . '-' . 'original' . '.'. $extension;
+    	$destination = variable_get('file_default_scheme', 'public') . '://' . $original_local_path;
+    	if (!file_exists($destination)) {
+    		// Create the resize directory.
+    		$directory = dirname($destination);
+    		file_prepare_directory($directory, FILE_CREATE_DIRECTORY);
+	    	$handle = fopen($destination, 'w');
+	    	fwrite($handle, file_get_contents($local_path));
+	    	fclose($handle);
+	    	@chmod($destination, 0664);
+    	}
+    }
 
     // If getting this far, the image exists and is not the right size, needs
     // to be saved locally from a remote server, or needs attributes added.
@@ -438,6 +453,7 @@ function image_resize_filter_get_images($settings, $text) {
       'img_tag' => $img_tag,
       'has_link' => $has_link,
       'original' => $src,
+      'original_local' => variable_get('file_default_scheme', 'public') . '://' . $original_local_path,
       'location' => $location,
       'local_path' => $local_path,
       'mime' => $image_size['mime'],
@@ -525,10 +541,12 @@ function image_resize_filter_image_tag($image = NULL, $settings = NULL) {
   global $base_url;
 
   $src = file_create_url($image['destination']);
+  $orig_src = file_create_url($image['original_local']); 
 
   // Strip the http:// from the path if the original did not include it.
   if (!preg_match('/^http[s]?:\/\/' . preg_quote($_SERVER['HTTP_HOST']) . '/', $image['original'])) {
     $src = preg_replace('/^http[s]?:\/\/' . preg_quote($_SERVER['HTTP_HOST']) . '/', '', $src);
+    $orig_src = preg_replace('/^http[s]?:\/\/' . preg_quote($_SERVER['HTTP_HOST']) . '/', '', $orig_src);
   }
   $image['attributes']['src'] = $src;
 
@@ -536,7 +554,8 @@ function image_resize_filter_image_tag($image = NULL, $settings = NULL) {
   $image['link'] = FALSE;
   if ($image['resize'] && $settings['link'] && !$image['has_link']) {
     $image['link'] = array();
-    $image['link']['attributes'] = array('href' => $image['original']);
+    //$image['link']['attributes'] = array('href' => $image['original']);
+    $image['link']['attributes'] = array('href' => $orig_src);
     if (!empty($settings['class'])) {
       $image['link']['attributes']['class'] = $settings['class'];
     }
