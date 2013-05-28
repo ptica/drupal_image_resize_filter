@@ -453,7 +453,7 @@ function image_resize_filter_get_images($settings, $text) {
       'img_tag' => $img_tag,
       'has_link' => $has_link,
       'original' => $src,
-      'original_local' => variable_get('file_default_scheme', 'public') . '://' . $original_local_path,
+      'original_local' => variable_get('file_default_scheme', 'public') . '://' . @$original_local_path,
       'location' => $location,
       'local_path' => $local_path,
       'mime' => $image_size['mime'],
